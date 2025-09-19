@@ -1,5 +1,34 @@
 # Configuration for https://github.com/actions/labeler (V6+ format)
 
+# Label for any changes to Python files
+lang-python:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.py"
+
+# Label for any changes to tests
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**/*"
+          - "**/*test*.py"
+
+# Label for any changes to CI/CD
+internal:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**/*"
+          - "**/*.yml"
+          - "**/*.yaml"
+          - "deploy.sh"
+
+# Label for infrastructure changes
+infrastructure:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "cloudformation-template.yaml"
+          - "**/infrastructure/**/*"
+
 # Label for any changes to dependencies
 upgrade:
   - changed-files:
