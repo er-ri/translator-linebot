@@ -31,6 +31,17 @@
         ],
         "editor.trimAutoWhitespace": true
     },
+    // YAML Configuration
+    "[yaml]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false
+    },
+    "[yml]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false
+    },
     // MyPy Type Checking
     "mypy-type-checker.enable": true,
     "mypy-type-checker.args": [
