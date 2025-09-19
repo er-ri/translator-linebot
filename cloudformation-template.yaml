@@ -1,0 +1,263 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'LINE Bot Translator - Serverless translation bot using AWS Lambda and Amazon Bedrock'
+
+Parameters:
+  LineChannelAccessToken:
+    Type: String
+    Description: 'LINE Channel Access Token from LINE Developers Console'
+    NoEcho: true
+    MinLength: 1
+    ConstraintDescription: 'LINE Channel Access Token is required'
+
+  LineChannelSecret:
+    Type: String
+    Description: 'LINE Channel Secret from LINE Developers Console'
+    NoEcho: true
+    MinLength: 1
+    ConstraintDescription: 'LINE Channel Secret is required'
+
+  BedrockRegion:
+    Type: String
+    Description: 'AWS Region where Bedrock is available'
+    Default: 'ap-northeast-1'
+    AllowedValues:
+      - us-east-1
+      - us-west-2
+      - eu-west-1
+      - ap-northeast-1
+      - ap-southeast-1
+      - ap-southeast-2
+    ConstraintDescription: 'Must be a valid AWS region with Bedrock support'
+
+  BedrockModelId:
+    Type: String
+    Description: 'Model ID for the Bedrock model'
+    Default: 'apac.amazon.nova-pro-v1:0'
+
+  LambdaTimeout:
+    Type: Number
+    Description: 'Lambda function timeout in seconds'
+    Default: 30
+    MinValue: 3
+    MaxValue: 900
+
+  LambdaMemorySize:
+    Type: Number
+    Description: 'Lambda function memory size in MB'
+    Default: 256
+    AllowedValues: [128, 256, 512, 1024, 2048, 3008]
+
+Resources:
+  # IAM Role for Lambda Function
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-lambda-execution-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockInvokePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - "*"
+        - PolicyName: CloudWatchLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-lambda-function*'
+
+  # CloudWatch Log Group
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-lambda-function'
+      RetentionInDays: 14
+
+  # Lambda Function
+  TranslatorBotFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-lambda-function'
+      Runtime: python3.12
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: !Ref LambdaTimeout
+      MemorySize: !Ref LambdaMemorySize
+      Environment:
+        Variables:
+          LINE_CHANNEL_ACCESS_TOKEN: !Ref LineChannelAccessToken
+          LINE_CHANNEL_SECRET: !Ref LineChannelSecret
+          BEDROCK_REGION: !Ref BedrockRegion
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              try:
+                  # Check if this is the initial deployment
+                  if not os.environ.get('LINE_CHANNEL_ACCESS_TOKEN'):
+                      logger.warning("LINE_CHANNEL_ACCESS_TOKEN not configured")
+                      return {
+                          'statusCode': 500,
+                          'body': json.dumps({'error': 'LINE channel not configured'})
+                      }
+
+                  # Basic webhook validation
+                  body = event.get('body', '')
+                  signature = event.get('headers', {}).get('x-line-signature', '')
+
+                  if not signature:
+                      logger.error("Missing LINE signature")
+                      return {
+                          'statusCode': 400,
+                          'body': json.dumps({'error': 'Missing signature'})
+                      }
+
+                  logger.info("Received LINE webhook - full translation code needs deployment")
+
+                  # Return success for initial testing
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': 'Basic webhook received - deploy full code for translation'
+                      })
+                  }
+
+              except Exception as e:
+                  logger.error(f"Error: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
+      Description: 'LINE Bot Translator using Amazon Bedrock for Japanese-English translation'
+      Tags:
+        - Key: Application
+          Value: Translator-LineBot
+        - Key: Environment
+          Value: Production
+
+  # Lambda Function URL
+  LambdaFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref TranslatorBotFunction
+      AuthType: NONE
+      Cors:
+        AllowCredentials: false
+        AllowMethods:
+          - POST
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - "*"
+        MaxAge: 86400
+
+  # Lambda Function URL Permission
+  LambdaFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref TranslatorBotFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  # CloudWatch Alarm for Lambda Errors
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-lambda-errors'
+      AlarmDescription: 'Alarm for Lambda function errors'
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref TranslatorBotFunction
+      TreatMissingData: notBreaching
+
+  # CloudWatch Alarm for Lambda Duration
+  LambdaDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-lambda-duration'
+      AlarmDescription: 'Alarm for Lambda function duration'
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 25000  # 25 seconds
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref TranslatorBotFunction
+      TreatMissingData: notBreaching
+
+Outputs:
+  LambdaFunctionName:
+    Description: 'Name of the Lambda function'
+    Value: !Ref TranslatorBotFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-function-name'
+
+  LambdaFunctionArn:
+    Description: 'ARN of the Lambda function'
+    Value: !GetAtt TranslatorBotFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-function-arn'
+
+  LambdaFunctionUrl:
+    Description: 'Lambda Function URL for the LINE Bot'
+    Value: !GetAtt LambdaFunctionUrl.FunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-function-url'
+
+  LambdaExecutionRoleArn:
+    Description: 'ARN of the Lambda execution role'
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-execution-role-arn'
+
+  CloudWatchLogGroup:
+    Description: 'CloudWatch Log Group for monitoring'
+    Value: !Ref LambdaLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-log-group'
+
+  DeploymentInstructions:
+    Description: 'Next steps for deployment'
+    Value: !Sub |
+      1. Update Lambda function code using AWS CLI or Console
+      2. Set webhook URL in LINE Console: ${LambdaFunctionUrl.FunctionUrl}
+      3. Test the webhook connection in LINE Developers Console
+      4. Add bot to LINE group/chat and test with @bot messages
