@@ -1,33 +1,45 @@
-# Configuration for https://github.com/actions/labeler
-
-# Label for any changes to Python files
-lang-python:
-  - "**/*.py"
-
-# Label for any changes to tests
-testing:
-  - "tests/**/*"
-  - "**/*test*.py"
-
-# Label for any changes to CI/CD
-internal:
-  - ".github/**/*"
-  - "**/*.yml"
-  - "**/*.yaml"
-  - "deploy.sh"
+# Configuration for https://github.com/actions/labeler (V6+ format)
 
 # Label for any changes to dependencies
 upgrade:
-  - "requirements*.txt"
-  - "pyproject.toml"
-  - "uv.lock"
-
-# Label for infrastructure changes
-infrastructure:
-  - "cloudformation-template.yaml"
-  - "**/infrastructure/**/*"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "requirements*.txt"
+          - "pyproject.toml"
+          - "uv.lock"
 
 # Label for any changes to the main application logic
 feature:
-  - "lambda_function.py"
-  - "src/**/*"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "lambda_function.py"
+          - "src/**/*"
+
+# Label for documentation changes
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "README.md"
+          - "**/*.md"
+          - "docs/**/*"
+
+# Label for bug fixes (based on branch name)
+bug:
+  - head-branch: ["fix/", "hotfix/", "bugfix/"]
+
+# Label for refactoring changes (based on branch name)
+refactor:
+  - head-branch: ["refactor/", "cleanup/"]
+
+# Label for security-related changes (based on branch name or files)
+security:
+  - any:
+      - head-branch: ["security/", "sec/"]
+      - changed-files:
+          - any-glob-to-any-file:
+              - "**/security/**/*"
+              - "**/*security*"
+
+# Label for breaking changes (based on branch name)
+breaking:
+  - head-branch: ["breaking/", "major/"]
