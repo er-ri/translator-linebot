@@ -74,8 +74,10 @@ translator-linebot/
 4. **Run the deployment script**:
 
    ```bash
-   ./deploy.sh
+   ./deploy.sh --update-layer
    ```
+
+   > The argument `--update-layer` will only need to added for the first deployment or when dependencies change.
 
 5. **Update LINE Webhook URL**:
 
