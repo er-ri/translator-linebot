@@ -1,0 +1,45 @@
+repos:
+  # Built-in pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: detect-aws-credentials
+        args: ["--allow-missing-credentials"]
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: check-executables-have-shebangs
+
+  # Ruff for linting and formatting (replaces black, isort, flake8, etc.)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.15
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix, --unsafe-fixes]
+      # Run the formatter
+      - id: ruff-format
+
+  # MyPy for type checking (all Python files)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        files: \.py$
+        additional_dependencies:
+          - types-boto3
+          - boto3-stubs[bedrock-runtime]
+        args: [--config-file=pyproject.toml]
+
+  # Additional Python-specific checks
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.15.0
+    hooks:
+      - id: pyupgrade
+        args: [--py312-plus]
+
+ci:
+  autoupdate_schedule: weekly
